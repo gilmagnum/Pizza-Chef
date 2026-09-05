@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>פיצה ארקייד 🍕</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            padding: 8px;
+            background: #111;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+            color: #fff;
+            user-select: none;
+            touch-action: pan-y;
+        }
+
+        h1 {
+            margin: 5px 0;
+            font-size: clamp(16px, 5vw, 24px);
+            color: #ffcc00;
+            text-shadow: 0 0 10px rgba(255, 204, 0, 0.6);
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
+        #game-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: flex-start;
+            justify-content: center;
+            width: 100%;
+            max-width: 700px;
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 25px rgba(255, 100, 0, 0.5);
+            outline: 4px solid #ff4500;
+            outline-offset: -4px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #1a1a1a;
+            touch-action: none;
+            width: 100%;
+            max-width: 480px;
+            aspect-ratio: 4 / 5;
+            flex: 1 1 300px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, #2a1b12 0%, #0d0805 100%);
+            touch-action: none;
+        }
+
+        #sidebar {
+            width: 180px;
+            max-width: 480px;
+            flex: 0 1 180px;
+            background: #222;
+            border: 3px solid #444;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+
+        #sidebar h3 {
+            margin-top: 0;
+            font-size: 16px;
+            color: #ffcc00;
+            text-align: center;
+            border-bottom: 2px solid #444;
+            padding-bottom: 8px;
+        }
+
+        .high-score-item {
+            font-size: 15px;
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+            color: #ddd;
+        }
+
+        .instructions {
+            margin-top: 10px;
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 6px 14px;
+            border-radius: 15px;
+            text-align: center;
+            color: #ccc;
+        }
+
+        #sound-toggle {
+            margin-top: 10px;
+            width: 100%;
+            padding: 6px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: #333;
+            color: #fff;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 700px) {
+            #game-layout { flex-direction: column; align-items: center; }
+            #sidebar { width: 100%; max-width: 480px; order: 2; }
+        }
+
+        @media (max-height: 700px) {
+            .instructions { display: none; }
+            h1 { margin: 2px 0; }
+        }
+    </style>
+<!-- arcaide-leaderboard -->
+<script src="https://gilmagnum.github.io/games/config.js"></script>
+<script src="https://gilmagnum.github.io/games/leaderboard.js"></script>
+<style>
+  .lb-btn{width:100%;margin-top:10px;padding:9px 14px;border:1px solid rgba(255,255,255,.2);border-radius:10px;
+    background:rgba(255,255,255,.09);color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  .lb-btn:hover{background:rgba(255,255,255,.18)}
+  .lb-home{display:block;margin-top:8px;text-align:center;font-size:12px;color:#aaa;text-decoration:none}
+  .lb-home:hover{color:#fff}
+</style>
+<!-- arcaide-pwa: installable to the home screen -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<meta name="theme-color" content="#111111">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="פיצה">
+</head>
+<body>
+
+    <h1>🍕 פיצה ארקייד - אש על המגש 🍕</h1>
+
+    <div id="game-layout">
+        <div id="game-container">
+            <canvas id="gameCanvas" width="480" height="600"></canvas>
+        </div>
+
+        <div id="sidebar">
+            <h3>🏆 טבלת שיאים</h3>
+            <div id="high-scores-list">טוען...</div>
+            <div style="margin-top: 15px; font-size:11px; color:#aaa; line-height: 1.4;">
+                <b>חוקים:</b><br>
+                🟡 בצק ← 🔴 רוטב ← 🧀 גבינה ← 🟢 תוספת ירוקה מבוקשת<br><br>
+                🔥 קומבו = בונוס גדל<br>
+                ❌ זבוב = פסילה + איפוס קומבו<br>
+                💖 לב = חיים (עד 5 מקס')<br>
+                ⏱️ שעון = האטה
+            </div>
+            <button id="sound-toggle">🔊 מוזיקה: פועלת</button>
+            <button class="lb-btn" id="btn-scores">🏆 טבלה מלאה</button>
+            <a class="lb-home" href="https://gilmagnum.github.io/games/">← כל המשחקים</a>
+        </div>
+    </div>
+
+    <div class="instructions">
+        מחשב: <b>חיצי מקלדת ⬅️ ➡️ ⬆️ ⬇️</b> | מובייל: <b>גררו את האצבע</b> | התחלה: <b>רווח / לחיצה / מגע</b>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // ==================== אודיו ====================
+        let audioCtx = null;
+        let musicEnabled = true;
+        let musicNodes = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (musicEnabled && !musicNodes) startMusic();
+        }
+
+        function startMusic() {
+            if (!audioCtx) return;
+            try {
+                const masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.05;
+                masterGain.connect(audioCtx.destination);
+
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator();
+                osc1.type = 'sine';
+                osc2.type = 'sine';
+                osc1.frequency.value = 220;
+                osc2.frequency.value = 220 * 1.5;
+
+                const lfo = audioCtx.createOscillator();
+                const lfoGain = audioCtx.createGain();
+                lfo.frequency.value = 0.15;
+                lfoGain.gain.value = 0.02;
+                lfo.connect(lfoGain);
+                lfoGain.connect(masterGain.gain);
+
+                osc1.connect(masterGain);
+                osc2.connect(masterGain);
+                osc1.start();
+                osc2.start();
+                lfo.start();
+
+                musicNodes = { osc1, osc2, lfo, masterGain };
+            } catch (e) {}
+        }
+
+        function stopMusic() {
+            if (musicNodes) {
+                try {
+                    musicNodes.osc1.stop();
+                    musicNodes.osc2.stop();
+                    musicNodes.lfo.stop();
+                } catch (e) {}
+                musicNodes = null;
+            }
+        }
+
+        function updateMusicPitch() {
+            if (musicNodes) {
+                const base = 220 + Math.min(pizzasCompleted, SPEED_CAP_FROM) * 8;
+                musicNodes.osc1.frequency.setTargetAtTime(base, audioCtx.currentTime, 0.5);
+                musicNodes.osc2.frequency.setTargetAtTime(base * 1.5, audioCtx.currentTime, 0.5);
+            }
+        }
+
+        document.getElementById('sound-toggle').addEventListener('click', () => {
+            musicEnabled = !musicEnabled;
+            document.getElementById('sound-toggle').textContent = musicEnabled ? '🔊 מוזיקה: פועלת' : '🔇 מוזיקה: כבויה';
+            if (!musicEnabled) stopMusic();
+            else if (audioCtx) startMusic();
+        });
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            try {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                let now = audioCtx.currentTime;
+
+                if (type === 'success') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'error') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.exponentialRampToValueAtTime(80, now + 0.2);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                } else if (type === 'bonus') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(587.33, now);
+                    osc.frequency.setValueAtTime(880, now + 0.1);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'levelup') {
+                    [523, 659, 784, 1047].forEach((freq, i) => {
+                        let o = audioCtx.createOscillator();
+                        let g = audioCtx.createGain();
+                        o.connect(g);
+                        g.connect(audioCtx.destination);
+                        o.type = 'triangle';
+                        o.frequency.value = freq;
+                        let t = now + i * 0.08;
+                        g.gain.setValueAtTime(0.12, t);
+                        g.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+                        o.start(t);
+                        o.stop(t + 0.2);
+                    });
+                } else if (type === 'pizza') {
+                    [660, 880, 1100, 1320].forEach((freq, i) => {
+                        let o = audioCtx.createOscillator();
+                        let g = audioCtx.createGain();
+                        o.connect(g);
+                        g.connect(audioCtx.destination);
+                        o.type = 'sine';
+                        o.frequency.value = freq;
+                        let t = now + i * 0.05;
+                        g.gain.setValueAtTime(0.13, t);
+                        g.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+                        o.start(t);
+                        o.stop(t + 0.3);
+                    });
+                }
+            } catch(e) {}
+        }
+
+        // ==================== מצב משחק ====================
+        let gameState = 'menu';
+        // arcaide-trays: the run is measured in completed trays (pizzasCompleted)
+        let lives = 3;
+        let currentStep = 0;
+        const stepsOrder = ['dough', 'sauce', 'cheese', 'topping'];
+
+        let targetTopping = '🍄';
+        const toppingEmojis = ['🍄', '🫒', '🫑', '🧅', '🍅', '🌽'];
+
+        let slowTimer = 0;
+        let isSlowMotion = false;
+
+        let combo = 0;
+        let maxComboThisRound = 0;
+
+        let floatingTexts = [];
+        let particles = [];
+        let levelUpTimer = 0;
+        let shakeTimer = 0;
+        let shakeMagnitude = 0;
+
+        let catcher = {
+            x: canvas.width / 2 - 50,
+            y: canvas.height - 90,
+            width: 100,
+            height: 38,
+            speed: 7
+        };
+
+        let currentPizzaLayers = {
+            hasDough: false,
+            hasSauce: false,
+            hasCheese: false,
+            activeTopping: null
+        };
+
+        let items = [];
+        let spawnTimer = 0;
+        const START_SPAWN_INTERVAL = 115;
+        const MIN_SPAWN_INTERVAL = 45;
+        const SPAWN_STEP_PER_PIZZA = 5;
+        let spawnInterval = START_SPAWN_INTERVAL;
+
+        const START_SPEED = 1.7;
+        const MAX_SPEED = 4.2;
+        const SPEED_STEP_PER_PIZZA = 0.18;
+        let speedBase = START_SPEED;
+
+        let pizzasCompleted = 0;
+        const MAX_CONCURRENT_ITEMS = 4;
+        const GLOW_DISABLED_FROM = 4;   // החל ממגש מס' 5 - בלי הבהוב, השחקן שם לב לבד
+        const SPEED_CAP_FROM = 9;       // החל ממגש מס' 10 - בלי הגברת מהירות נוספת
+        const BOTTOM_HUD_HEIGHT = 60;   // רצועה קבועה בתחתית שלא נגישה למגש - מציגה התקדמות ומונה מגשים
+
+        const itemTypes = [
+            { type: 'dough', name: 'בצק', color: '#ffe6a7', borderColor: '#d4a373', emoji: '🫓', points: 10 },
+            { type: 'sauce', name: 'רוטב', color: '#900c3f', borderColor: '#ff4d4d', emoji: '🥫', points: 10 },
+            { type: 'cheese', name: 'גבינה', color: '#ffea00', borderColor: '#ff9900', emoji: '🧀', points: 10 },
+            { type: 'topping', name: 'תוספת', color: '#2d6a4f', borderColor: '#52b788', emoji: '🍄', points: 15 },
+            { type: 'bad', name: 'זבוב', color: '#222222', borderColor: '#666666', emoji: '🪰', isBad: true },
+            { type: 'heart', name: 'לב', color: '#c71585', borderColor: '#ff69b4', emoji: '💖', isHeart: true },
+            { type: 'clock', name: 'שעון', color: '#0077b6', borderColor: '#00b4d8', emoji: '⏱️', isClock: true }
+        ];
+
+        let keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
+
+        // ArcAIde global leaderboard
+        if (window.Leaderboard) {
+            Leaderboard.init({ game: 'pizza-chef', title: 'פיצה ארקייד', scoreLabel: 'מגשים' });
+            document.getElementById('btn-scores').addEventListener('click', () => Leaderboard.show());
+        } else {
+            document.getElementById('btn-scores').style.display = 'none';
+        }
+
+        // ==================== שיאים גלובליים (ArcAIde) ====================
+        function esc(t) {
+            return String(t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        async function loadHighScores() {
+            const listEl = document.getElementById('high-scores-list');
+            if (!window.Leaderboard) { listEl.textContent = 'אין חיבור'; return; }
+            try {
+                const rows = await Leaderboard.top(5);
+                listEl.innerHTML = '';
+                if (!rows || !rows.length) {
+                    listEl.innerHTML = '<div class="high-score-item"><span>הלוח פתוח — תהיה הראשון 🚀</span></div>';
+                    return;
+                }
+                const medals = ['🥇','🥈','🥉','4.','5.'];
+                rows.forEach((r, i) => {
+                    listEl.innerHTML += `<div class="high-score-item"><span>${medals[i] || (i+1)+'.'} ${esc(r.player)}</span> <b>${r.score}</b></div>`;
+                });
+            } catch (e) {
+                listEl.innerHTML = '<div class="high-score-item"><span>אין חיבור לטבלה</span></div>';
+            }
+        }
+
+        // Opens the shared panel; it asks for a name when the run makes the top 10.
+        function saveHighScore(newScore) {
+            if (!window.Leaderboard) return;
+            setTimeout(() => {
+                Leaderboard.gameOver(newScore, {}).then(loadHighScores);
+            }, 900);
+        }
+
+        function updateHighScoresDisplay() { loadHighScores(); }
+
+        // ==================== קלט: מקלדת ====================
+        window.addEventListener('keydown', (e) => {
+            initAudio();
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+            if (e.key === 'ArrowLeft') keys.ArrowLeft = true;
+            if (e.key === 'ArrowRight') keys.ArrowRight = true;
+            if (e.key === 'ArrowUp') keys.ArrowUp = true;
+            if (e.key === 'ArrowDown') keys.ArrowDown = true;
+
+            if ((gameState === 'menu' || gameState === 'gameover') && e.key === ' ') {
+                startGame();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft') keys.ArrowLeft = false;
+            if (e.key === 'ArrowRight') keys.ArrowRight = false;
+            if (e.key === 'ArrowUp') keys.ArrowUp = false;
+            if (e.key === 'ArrowDown') keys.ArrowDown = false;
+        });
+
+        canvas.addEventListener('click', () => {
+            initAudio();
+            if (gameState === 'menu' || gameState === 'gameover') {
+                startGame();
+            }
+        });
+
+        // ==================== קלט: מגע (מובייל) ====================
+        let touchActive = false;
+
+        function getCanvasTouchPos(touch) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (touch.clientX - rect.left) * scaleX,
+                y: (touch.clientY - rect.top) * scaleY
+            };
+        }
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            initAudio();
+            if (gameState === 'menu' || gameState === 'gameover') {
+                startGame();
+                return;
+            }
+            touchActive = true;
+            const pos = getCanvasTouchPos(e.touches[0]);
+            moveCatcherTo(pos.x, pos.y);
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!touchActive || gameState !== 'playing') return;
+            const pos = getCanvasTouchPos(e.touches[0]);
+            moveCatcherTo(pos.x, pos.y);
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchActive = false;
+        }, { passive: false });
+
+        function moveCatcherTo(x, y) {
+            catcher.x = x - catcher.width / 2;
+            catcher.y = y - catcher.height / 2;
+            clampCatcher();
+        }
+
+        function clampCatcher() {
+            if (catcher.x < 0) catcher.x = 0;
+            if (catcher.x + catcher.width > canvas.width) catcher.x = canvas.width - catcher.width;
+            if (catcher.y < canvas.height / 2.2) catcher.y = canvas.height / 2.2;
+            if (catcher.y + catcher.height > canvas.height - BOTTOM_HUD_HEIGHT) catcher.y = canvas.height - BOTTOM_HUD_HEIGHT - catcher.height;
+        }
+
+        // ==================== לוגיקת משחק ====================
+        function setSidebarVisible(visible) {
+            document.getElementById('sidebar').style.display = visible ? 'block' : 'none';
+        }
+
+        function applyGameAreaSize() {
+            const container = document.getElementById('game-container');
+            const layout = document.getElementById('game-layout');
+            if (gameState === 'playing') {
+                const h1 = document.querySelector('h1');
+                const instr = document.querySelector('.instructions');
+                const usedH = (h1 ? h1.offsetHeight : 0) + (instr && instr.offsetParent !== null ? instr.offsetHeight : 0) + 40;
+                const availH = Math.max(200, window.innerHeight - usedH);
+                const availW = Math.max(200, window.innerWidth - 16);
+
+                let w = Math.min(availW, availH * 0.8);
+                let h = w * 1.25;
+                if (h > availH) {
+                    h = availH;
+                    w = h * 0.8;
+                }
+
+                layout.style.maxWidth = 'none';
+                container.style.flex = 'none';
+                container.style.maxWidth = 'none';
+                container.style.width = w + 'px';
+                container.style.height = h + 'px';
+            } else {
+                layout.style.maxWidth = '';
+                container.style.flex = '';
+                container.style.maxWidth = '';
+                container.style.width = '';
+                container.style.height = '';
+            }
+        }
+
+        window.addEventListener('resize', applyGameAreaSize);
+        window.addEventListener('orientationchange', () => setTimeout(applyGameAreaSize, 100));
+
+        function startGame() {
+            lives = 3;
+            currentStep = 0;
+            items = [];
+            floatingTexts = [];
+            particles = [];
+            combo = 0;
+            maxComboThisRound = 0;
+            isSlowMotion = false;
+            slowTimer = 0;
+            spawnInterval = START_SPAWN_INTERVAL;
+            speedBase = START_SPEED;
+            pizzasCompleted = 0;
+            levelUpTimer = 0;
+            shakeTimer = 0;
+            pickNewTargetTopping();
+            currentPizzaLayers = { hasDough: false, hasSauce: false, hasCheese: false, activeTopping: null };
+            catcher.x = canvas.width / 2 - 50;
+            catcher.y = canvas.height - BOTTOM_HUD_HEIGHT - catcher.height - 10;
+            gameState = 'playing';
+            setSidebarVisible(false);
+            applyGameAreaSize();
+        }
+
+        function pickNewTargetTopping() {
+            targetTopping = toppingEmojis[Math.floor(Math.random() * toppingEmojis.length)];
+        }
+
+        function addFloatingText(text, x, y, isPositive) {
+            floatingTexts.push({ text, x, y, alpha: 1.0, isPositive });
+        }
+
+        function triggerShake(magnitude, durationFrames) {
+            shakeMagnitude = magnitude;
+            shakeTimer = durationFrames;
+        }
+
+        function spawnConfetti(x, y) {
+            const colors = ['#ff4500', '#ffcc00', '#52b788', '#ff69b4', '#00b4d8', '#ffffff'];
+            for (let i = 0; i < 40; i++) {
+                particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 1.2) * 8,
+                    gravity: 0.25,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    size: 3 + Math.random() * 4,
+                    life: 60 + Math.random() * 30
+                });
+            }
+        }
+
+        function spawnItem() {
+            let rand = Math.random();
+            let selectedType;
+
+            if (rand < 0.12 && pizzasCompleted > 0) {
+                selectedType = itemTypes.find(i => i.isBad);
+            } else if (rand < 0.17) {
+                selectedType = itemTypes.find(i => i.isHeart);
+            } else if (rand < 0.22) {
+                selectedType = itemTypes.find(i => i.isClock);
+            } else {
+                let validTypes = itemTypes.filter(i => !i.isBad && !i.isHeart && !i.isClock);
+                let chosen;
+
+                // מטים את ההסתברות לטובת המצרך הנדרש כרגע, כדי לקצר את זמן ההמתנה,
+                // אבל לא תמיד - כדי שהמשחק ישאר מאתגר ולא יהיה חיזוי מוחלט
+                const neededChance = Math.max(0.35, 0.55 - pizzasCompleted * 0.015);
+                const neededTypeName = stepsOrder[currentStep];
+
+                if (Math.random() < neededChance) {
+                    chosen = {...validTypes.find(i => i.type === neededTypeName)};
+                    if (chosen.type === 'topping') {
+                        chosen.emoji = targetTopping;
+                    }
+                } else {
+                    chosen = {...validTypes[Math.floor(Math.random() * validTypes.length)]};
+                    if (chosen.type === 'topping') {
+                        let randIndex = Math.floor(Math.random() * toppingEmojis.length);
+                        chosen.emoji = toppingEmojis[randIndex];
+                    }
+                }
+                selectedType = chosen;
+            }
+
+            const isNeeded = !selectedType.isBad && !selectedType.isHeart && !selectedType.isClock &&
+                selectedType.type === stepsOrder[currentStep] &&
+                (selectedType.type !== 'topping' || selectedType.emoji === targetTopping);
+
+            let x = Math.random() * (canvas.width - 40) + 20;
+            items.push({
+                x, y: -30, radius: 23,
+                speed: speedBase + Math.random() * 0.4,
+                data: selectedType,
+                isNeeded,
+                pulsePhase: Math.random() * Math.PI * 2
+            });
+        }
+
+        function update() {
+            if (levelUpTimer > 0) levelUpTimer--;
+            if (shakeTimer > 0) shakeTimer--;
+
+            if (gameState !== 'playing') return;
+
+            if (isSlowMotion) {
+                slowTimer--;
+                if (slowTimer <= 0) isSlowMotion = false;
+            }
+
+            if (keys.ArrowLeft) catcher.x -= catcher.speed;
+            if (keys.ArrowRight) catcher.x += catcher.speed;
+            if (keys.ArrowUp) catcher.y -= catcher.speed;
+            if (keys.ArrowDown) catcher.y += catcher.speed;
+
+            clampCatcher();
+
+            spawnTimer++;
+            if (spawnTimer >= spawnInterval && items.length < MAX_CONCURRENT_ITEMS) {
+                spawnItem();
+                spawnTimer = 0;
+            }
+
+            let speedMultiplier = isSlowMotion ? 0.4 : 1;
+
+            for (let i = items.length - 1; i >= 0; i--) {
+                let item = items[i];
+                item.y += item.speed * speedMultiplier;
+
+                if (
+                    item.y + item.radius >= catcher.y &&
+                    item.y - item.radius <= catcher.y + catcher.height &&
+                    item.x >= catcher.x &&
+                    item.x <= catcher.x + catcher.width
+                ) {
+                    handleCatch(item.data, item.x, item.y);
+                    items.splice(i, 1);
+                    continue;
+                }
+
+                if (item.y > canvas.height + 30) {
+                    items.splice(i, 1);
+                }
+            }
+
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                let ft = floatingTexts[i];
+                ft.y -= 1.2;
+                ft.alpha -= 0.03;
+                if (ft.alpha <= 0) floatingTexts.splice(i, 1);
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.vy += p.gravity;
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+        }
+
+        function handleCatch(itemData, x, y) {
+            if (itemData.isBad) {
+                playSound('error');
+                lives--;
+                combo = 0;
+                triggerShake(6, 15);
+                addFloatingText("-1 חיים", x, y, false);
+                if (lives <= 0) triggerGameOver();
+                return;
+            }
+
+            if (itemData.isHeart) {
+                playSound('bonus');
+                if (lives < 5) {
+                    lives++;
+                    addFloatingText("+1 לב", x, y, true);
+                } else {
+                    addFloatingText("מקס לבבות!", x, y, true);
+                }
+                return;
+            }
+
+            if (itemData.isClock) {
+                playSound('bonus');
+                isSlowMotion = true;
+                slowTimer = 300;
+                addFloatingText("האטה! ⏱️", x, y, true);
+                return;
+            }
+
+            let expectedType = stepsOrder[currentStep];
+
+            if (itemData.type === expectedType) {
+                if (expectedType === 'topping') {
+                    if (itemData.emoji === targetTopping) {
+                        playSound('pizza');
+                        combo++;
+                        maxComboThisRound = Math.max(maxComboThisRound, combo);
+                        addFloatingText(combo > 2 ? `מגש! 🍕 קומבו ×${combo}` : 'מגש הושלם! 🍕', x, y, true);
+                        spawnConfetti(x, y);
+                        currentStep = 0;
+                        pickNewTargetTopping();
+                        currentPizzaLayers = { hasDough: false, hasSauce: false, hasCheese: false, activeTopping: null };
+
+                        pizzasCompleted++;
+                        const difficultyStep = Math.min(pizzasCompleted, SPEED_CAP_FROM);
+                        spawnInterval = Math.max(MIN_SPAWN_INTERVAL, START_SPAWN_INTERVAL - difficultyStep * SPAWN_STEP_PER_PIZZA);
+                        speedBase = Math.min(MAX_SPEED, START_SPEED + difficultyStep * SPEED_STEP_PER_PIZZA);
+                        levelUpTimer = 70;
+                        playSound('levelup');
+                        updateMusicPitch();
+                    } else {
+                        playSound('error');
+                        combo = 0;
+                        addFloatingText("לא התוספת המבוקשת", x, y, false);
+                    }
+                } else {
+                    playSound('success');
+                    combo++;
+                    maxComboThisRound = Math.max(maxComboThisRound, combo);
+                    addFloatingText(combo > 2 ? `קומבו ×${combo}` : '✓', x, y, true);
+                    if (expectedType === 'dough') currentPizzaLayers.hasDough = true;
+                    if (expectedType === 'sauce') currentPizzaLayers.hasSauce = true;
+                    if (expectedType === 'cheese') currentPizzaLayers.hasCheese = true;
+                    currentStep++;
+                }
+            } else {
+                playSound('error');
+                combo = 0;
+                addFloatingText("לא לפי הסדר", x, y, false);
+                triggerShake(3, 8);
+            }
+        }
+
+        function triggerGameOver() {
+            gameState = 'gameover';
+            stopMusic();
+            saveHighScore(pizzasCompleted);   // arcaide-trays: trays, not points
+            setSidebarVisible(true);
+            applyGameAreaSize();
+        }
+
+        // ==================== ציור ====================
+        function draw() {
+            ctx.save();
+
+            if (shakeTimer > 0) {
+                const dx = (Math.random() - 0.5) * shakeMagnitude;
+                const dy = (Math.random() - 0.5) * shakeMagnitude;
+                ctx.translate(dx, dy);
+            }
+
+            ctx.clearRect(-20, -20, canvas.width + 40, canvas.height + 40);
+
+            if (gameState === 'menu') {
+                drawMenu();
+                ctx.restore();
+                return;
+            }
+
+            if (gameState === 'gameover') {
+                drawGameOver();
+                ctx.restore();
+                return;
+            }
+
+            drawCatcherAndPizza();
+            drawItems();
+            drawParticles();
+            drawFloatingTexts();
+            drawHUD();
+            drawBottomHud();
+
+            if (levelUpTimer > 0) drawLevelUpBanner();
+
+            ctx.restore();
+        }
+
+        function drawMenu() {
+            ctx.fillStyle = "#ffcc00";
+            ctx.font = "bold 26px 'Segoe UI'";
+            ctx.textAlign = "center";
+            ctx.fillText("🍕 פיצה ארקייד 🍕", canvas.width / 2, canvas.height / 2 - 70);
+
+            ctx.fillStyle = "#fff";
+            ctx.font = "15px 'Segoe UI'";
+            ctx.fillText("סדר הכנה: בצק 🫓 ➡️ רוטב 🥫 ➡️ גבינה 🧀 ➡️ תוספת ירוקה 🟢", canvas.width / 2, canvas.height / 2 - 20);
+
+            ctx.fillStyle = "#ff4500";
+            ctx.beginPath();
+            ctx.roundRect(canvas.width / 2 - 110, canvas.height / 2 + 30, 220, 50, 10);
+            ctx.fill();
+
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 18px 'Segoe UI'";
+            ctx.fillText("לחץ / גע כאן להתחלה ▶", canvas.width / 2, canvas.height / 2 + 62);
+        }
+
+        function drawGameOver() {
+            ctx.fillStyle = "rgba(0,0,0,0.85)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = "#ff3333";
+            ctx.font = "bold 32px 'Segoe UI'";
+            ctx.textAlign = "center";
+            ctx.fillText("המשחק נגמר! 💀", canvas.width / 2, canvas.height / 2 - 60);
+
+            ctx.fillStyle = "#fff";
+            ctx.font = "20px 'Segoe UI'";
+            ctx.fillText(`מגשים שהושלמו: ${pizzasCompleted}`, canvas.width / 2, canvas.height / 2 - 15);
+            ctx.font = "16px 'Segoe UI'";
+            ctx.fillText(`קומבו מקסימלי: ${maxComboThisRound} 🔥`, canvas.width / 2, canvas.height / 2 + 15);
+
+            ctx.fillStyle = "#ffcc00";
+            ctx.font = "16px 'Segoe UI'";
+            ctx.fillText("לחץ רווח / גע כדי לשחק שוב", canvas.width / 2, canvas.height / 2 + 55);
+        }
+
+        function drawCatcherAndPizza() {
+            let pizzaX = catcher.x + catcher.width / 2;
+            let pizzaY = catcher.y + catcher.height / 2;
+
+            // המגש (טאבון קטן שהשף מחזיק)
+            ctx.fillStyle = "#d4a373";
+            ctx.beginPath();
+            ctx.roundRect(catcher.x, catcher.y, catcher.width, catcher.height, 10);
+            ctx.fill();
+            ctx.strokeStyle = "#ff4500";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // השף האיטלקי שנע עם המגש
+            ctx.save();
+            ctx.font = "38px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "alphabetic";
+            ctx.fillText("👨‍🍳", pizzaX, catcher.y - 6);
+            ctx.font = "13px 'Segoe UI'";
+            ctx.fillStyle = "#fff";
+            ctx.fillText("🇮🇹", pizzaX + 20, catcher.y - 32);
+            ctx.restore();
+
+            if (currentPizzaLayers.hasDough) {
+                ctx.fillStyle = "#ffe6a7";
+                ctx.beginPath();
+                ctx.arc(pizzaX, pizzaY, 36, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = "#d4a373";
+                ctx.stroke();
+            }
+            if (currentPizzaLayers.hasSauce) {
+                ctx.fillStyle = "#900c3f";
+                ctx.beginPath();
+                ctx.arc(pizzaX, pizzaY, 28, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            if (currentPizzaLayers.hasCheese) {
+                ctx.fillStyle = "#ffea00";
+                ctx.beginPath();
+                ctx.arc(pizzaX, pizzaY, 20, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function drawItems() {
+            items.forEach(item => {
+                const isNeeded = pizzasCompleted < GLOW_DISABLED_FROM &&
+                    !item.data.isBad && !item.data.isHeart && !item.data.isClock &&
+                    item.data.type === stepsOrder[currentStep] &&
+                    (item.data.type !== 'topping' || item.data.emoji === targetTopping);
+
+                let glow = 0;
+                if (isNeeded) {
+                    item.pulsePhase += 0.15;
+                    glow = (Math.sin(item.pulsePhase) + 1) / 2;
+                }
+
+                if (glow > 0) {
+                    ctx.save();
+                    ctx.shadowColor = '#ffffff';
+                    ctx.shadowBlur = 10 + glow * 15;
+                }
+
+                ctx.beginPath();
+                ctx.arc(item.x, item.y, item.radius + (isNeeded ? glow * 3 : 0), 0, Math.PI * 2);
+                ctx.fillStyle = item.data.color;
+                ctx.fill();
+                ctx.lineWidth = isNeeded ? 4 : 3;
+                ctx.strokeStyle = isNeeded ? '#ffffff' : item.data.borderColor;
+                ctx.stroke();
+
+                if (glow > 0) ctx.restore();
+
+                ctx.font = "20px Arial";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(item.data.emoji, item.x, item.y);
+            });
+        }
+
+        function drawParticles() {
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.life / 60);
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+                ctx.restore();
+            });
+        }
+
+        function drawFloatingTexts() {
+            floatingTexts.forEach(ft => {
+                ctx.save();
+                ctx.globalAlpha = ft.alpha;
+                ctx.font = "bold 16px 'Segoe UI'";
+                ctx.fillStyle = ft.isPositive ? "#06d6a0" : "#ef476f";
+                ctx.textAlign = "center";
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            });
+        }
+
+        function drawHUD() {
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 15px 'Segoe UI'";
+            ctx.textAlign = "right";
+            ctx.fillText(`🍕 מגשים: ${pizzasCompleted}`, canvas.width - 15, 25);
+            ctx.fillText(`❤️ חיים: ${'❤️'.repeat(Math.min(lives, 5))}`, canvas.width - 15, 50);
+
+            ctx.textAlign = "left";
+            ctx.fillText(`🍕 מגשים: ${pizzasCompleted}`, 15, 25);
+            if (combo > 1) {
+                ctx.fillStyle = "#ffcc00";
+                ctx.fillText(`🔥 קומבו: ${combo}`, 15, 50);
+            } else if (isSlowMotion) {
+                ctx.fillStyle = "#00b4d8";
+                ctx.fillText(`⏱️ האטה פעילה!`, 15, 50);
+            }
+
+            ctx.textAlign = "center";
+            ctx.font = "bold 17px 'Segoe UI'";
+            ctx.fillStyle = "#ffcc00";
+            let reqText = stepsOrder[currentStep] === 'topping'
+                ? `תוספת נדרשת: 🟢 ${targetTopping}`
+                : `מצרך נדרש: ${stepsOrder[currentStep] === 'dough' ? 'בצק 🫓' : stepsOrder[currentStep] === 'sauce' ? 'רוטב 🥫' : 'גבינה 🧀'}`;
+            ctx.fillText(reqText, canvas.width / 2, 30);
+        }
+
+        function drawBottomHud() {
+            const stepIcons = { dough: '🫓', sauce: '🥫', cheese: '🧀', topping: '🍕' };
+            const barTop = canvas.height - BOTTOM_HUD_HEIGHT;
+
+            // רקע לרצועה כדי להבדיל אותה מהמשחק עצמו
+            ctx.fillStyle = "rgba(0,0,0,0.35)";
+            ctx.fillRect(0, barTop, canvas.width, BOTTOM_HUD_HEIGHT);
+
+            // שורת התקדמות המגש הנוכחי - גדולה וברורה, קבועה במיקום
+            const barWidth = Math.min(260, canvas.width - 40);
+            const barX = canvas.width / 2 - barWidth / 2;
+            const barY = barTop + 8;
+            const stepWidth = barWidth / stepsOrder.length;
+
+            for (let i = 0; i < stepsOrder.length; i++) {
+                ctx.fillStyle = i < currentStep ? '#52b788' : (i === currentStep ? '#ffcc00' : '#444');
+                ctx.fillRect(barX + i * stepWidth + 2, barY, stepWidth - 4, 10);
+
+                ctx.font = "14px Arial";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = "#fff";
+                ctx.fillText(stepIcons[stepsOrder[i]], barX + i * stepWidth + stepWidth / 2, barY + 24);
+            }
+
+            // מונה מגשים ויזואלי - שורת פיצות שגדלה עם כל מגש שהושלם
+            const maxIcons = 14;
+            const shown = Math.min(pizzasCompleted, maxIcons);
+            const iconStr = '🍕'.repeat(shown) + (pizzasCompleted > maxIcons ? ` +${pizzasCompleted - maxIcons}` : '');
+            ctx.font = "13px Arial";
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#ffcc00";
+            ctx.fillText(iconStr || 'עדיין אין מגשים מוכנים', canvas.width / 2, barTop + 48);
+        }
+
+        function drawLevelUpBanner() {
+            const alpha = Math.min(1, levelUpTimer / 20);
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = "#ffcc00";
+            ctx.font = "bold 30px 'Segoe UI'";
+            ctx.textAlign = "center";
+            ctx.shadowColor = "#ff4500";
+            ctx.shadowBlur = 15;
+            ctx.fillText(`🍕 מגש מס' ${pizzasCompleted} הושלם! 🍕`, canvas.width / 2, canvas.height / 2 - 100);
+            ctx.restore();
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        loadHighScores();
+        loop();
+    </script>
+</body>
+</html>
