@@ -140,8 +140,8 @@
 .arcaide-pause-veil.hidden{ display:none; }
 </style>
 <!-- arcaide-leaderboard -->
-<script src="https://gilmagnum.github.io/games/config.js"></script>
-<script src="https://gilmagnum.github.io/games/leaderboard.js"></script>
+<script src="https://gilmagnum.github.io/games/config.js?v=4"></script>
+<script src="https://gilmagnum.github.io/games/leaderboard.js?v=4"></script>
 <style>
   .lb-btn{width:100%;margin-top:10px;padding:9px 14px;border:1px solid rgba(255,255,255,.2);border-radius:10px;
     background:rgba(255,255,255,.09);color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
@@ -440,7 +440,7 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
         // Opens the shared panel; it asks for a name when the run makes the top 10.
         function saveHighScore(newScore) {
             if (!window.Leaderboard) return;
-            Leaderboard.gameOverIn(900, newScore, {});
+            (Leaderboard.gameOverIn ? Leaderboard.gameOverIn(900, newScore, {}) : setTimeout(function(){ Leaderboard.gameOver(newScore, {}); }, 900));
         }
 
         function updateHighScoresDisplay() { loadHighScores(); }
@@ -593,7 +593,7 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
         });
 
         function startGame() {
-            if (window.Leaderboard) Leaderboard.cancelPending();   // a new round drops the old run's panel
+            if (window.Leaderboard && Leaderboard.cancelPending) Leaderboard.cancelPending();   // a new round drops the old run's panel
             arcadePaused = false; arcadeShowPause(false); if (window.Arcade) Arcade.setPaused(false);   // a fresh round is never paused
             lives = 2;
             currentStep = 0;
