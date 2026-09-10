@@ -129,7 +129,16 @@
             .instructions { display: none; }
             h1 { margin: 2px 0; }
         }
-    </style>
+    
+/* pause is visible, like in the other games */
+.arcaide-pause-veil{
+  position:absolute; inset:0; z-index:140; display:flex; align-items:center; justify-content:center;
+  background:rgba(6,10,20,0.62); backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px);
+  font-family:inherit; font-size:20px; font-weight:900; letter-spacing:1px; color:#ffd66b;
+  text-shadow:0 0 18px rgba(255,214,107,0.45); border-radius:inherit;
+}
+.arcaide-pause-veil.hidden{ display:none; }
+</style>
 <!-- arcaide-leaderboard -->
 <script src="https://gilmagnum.github.io/games/config.js"></script>
 <script src="https://gilmagnum.github.io/games/leaderboard.js"></script>
@@ -431,9 +440,7 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
         // Opens the shared panel; it asks for a name when the run makes the top 10.
         function saveHighScore(newScore) {
             if (!window.Leaderboard) return;
-            setTimeout(() => {
-                Leaderboard.gameOver(newScore, {}).then(loadHighScores);
-            }, 900);
+            Leaderboard.gameOverIn(900, newScore, {});
         }
 
         function updateHighScoresDisplay() { loadHighScores(); }
@@ -449,6 +456,7 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
             if (e.key === 'ArrowUp') keys.ArrowUp = true;
             if (e.key === 'ArrowDown') keys.ArrowDown = true;
 
+            if (arcadePaused) return;                       // paused means paused
             if ((gameState === 'menu' || gameState === 'gameover') && e.key === ' ') {
                 startGame();
             }
@@ -484,6 +492,7 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             initAudio();
+            if (arcadePaused) return;                       // paused means paused
             if (gameState === 'menu' || gameState === 'gameover') {
                 startGame();
                 return;
@@ -495,7 +504,7 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
 
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
-            if (!touchActive || gameState !== 'playing') return;
+            if (arcadePaused || !touchActive || gameState !== 'playing') return;
             const pos = getCanvasTouchPos(e.touches[0]);
             moveCatcherTo(pos.x, pos.y);
         }, { passive: false });
@@ -557,7 +566,35 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
         window.addEventListener('resize', applyGameAreaSize);
         window.addEventListener('orientationchange', () => setTimeout(applyGameAreaSize, 100));
 
+
+  // shared look for the paused state
+  var arcadeVeil = null;
+  function arcadeShowPause(on){
+    var host = document.getElementById('game-container');
+    if (!host) return;
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    if (!arcadeVeil){
+      arcadeVeil = document.createElement('div');
+      arcadeVeil.className = 'arcaide-pause-veil hidden';
+      arcadeVeil.textContent = '\u23F8 \u05DE\u05D5\u05E9\u05D4\u05D4';
+      host.appendChild(arcadeVeil);
+    }
+    arcadeVeil.classList.toggle('hidden', !on);
+  }
+
+        // pause while the tab is hidden, and never undo a pause the player asked for
+        let autoPaused = false;
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (!arcadePaused) { autoPaused = true; arcadePaused = true; stopMusic(); arcadeShowPause(true); if (window.Arcade) Arcade.setPaused(true); }
+            } else if (autoPaused) {
+                autoPaused = false; arcadePaused = false; if (musicEnabled) startMusic(); arcadeShowPause(false); if (window.Arcade) Arcade.setPaused(false);
+            }
+        });
+
         function startGame() {
+            if (window.Leaderboard) Leaderboard.cancelPending();   // a new round drops the old run's panel
+            arcadePaused = false; arcadeShowPause(false); if (window.Arcade) Arcade.setPaused(false);   // a fresh round is never paused
             lives = 2;
             currentStep = 0;
             items = [];
@@ -1073,8 +1110,8 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
         // arcAId shared control bar
         if (window.Arcade) {
             Arcade.controls({
-                onPause:   function () { arcadePaused = true;  stopMusic(); },
-                onResume:  function () { arcadePaused = false; if (musicEnabled) startMusic(); },
+                onPause:   function () { arcadePaused = true;  stopMusic(); arcadeShowPause(true); },
+                onResume:  function () { arcadePaused = false; if (musicEnabled) startMusic(); arcadeShowPause(false); },
                 onRestart: function () { arcadePaused = false; startGame(); },
                 onMute:    function (m) { musicEnabled = !m; if (m) stopMusic(); else startMusic(); },
                 theme: true
