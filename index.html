@@ -183,8 +183,9 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
                 <b>חוקים:</b><br>
                 🟡 בצק ← 🔴 רוטב ← 🧀 גבינה ← 🟢 תוספת ירוקה מבוקשת<br><br>
                 🔥 קומבו = בונוס גדל<br>
-                ❌ זבוב = פסילה + איפוס קומבו<br>
-                💖 לב = חיים (עד 5 מקס')<br>
+                🪰 זבוב = סוף משחק מיידי<br>
+                ❌ כל טעות = מינוס לב<br>
+                💖 לב = מתחילים עם אחד, אוספים עד 3<br>
                 ⏱️ שעון = האטה
             </div>
             <button class="lb-btn" id="btn-scores">🏆 טבלה מלאה</button>
@@ -337,7 +338,7 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
         // ==================== מצב משחק ====================
         let gameState = 'menu';
         // arcaide-trays: the run is measured in completed trays (pizzasCompleted)
-        let lives = 2;   // arcaide: was 3
+        let lives = 1;   // arcaide: start on a single life, hearts build it up to 3
         let currentStep = 0;
         const stepsOrder = ['dough', 'sauce', 'cheese', 'topping'];
 
@@ -353,6 +354,7 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
         let floatingTexts = [];
         let particles = [];
         let levelUpTimer = 0;
+        let fasterTimer = 0;
         let shakeTimer = 0;
         let shakeMagnitude = 0;
 
@@ -386,9 +388,10 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
         let pizzasCompleted = 0;
         const MAX_CONCURRENT_ITEMS = 4;
         const GLOW_DISABLED_FROM = 4;   // החל ממגש מס' 5 - בלי הבהוב, השחקן שם לב לבד
-        const SPEED_CAP_FROM = 9;       // arcaide: after tray 10 the ramp continues, gentler
-        const LATE_SPEED_STEP = 0.06;   // per tray beyond SPEED_CAP_FROM
-        const LATE_SPAWN_STEP = 1.6;
+        const SPEED_CAP_FROM = 9;        // arcaide: the early ramp runs to tray 10...
+        const LATE_EVERY = 2;            // ...then a real step every second tray
+        const LATE_SPEED_STEP = 0.25;    // per step
+        const LATE_SPAWN_STEP = 4;
         const HARD_MAX_SPEED = 7.2;
         const HARD_MIN_SPAWN = 26;
         const BOTTOM_HUD_HEIGHT = 60;   // רצועה קבועה בתחתית שלא נגישה למגש - מציגה התקדמות ומונה מגשים
@@ -595,7 +598,7 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
         function startGame() {
             if (window.Leaderboard && Leaderboard.cancelPending) Leaderboard.cancelPending();   // a new round drops the old run's panel
             arcadePaused = false; arcadeShowPause(false); if (window.Arcade) Arcade.setPaused(false);   // a fresh round is never paused
-            lives = 2;
+            lives = 1;
             currentStep = 0;
             items = [];
             floatingTexts = [];
@@ -608,6 +611,7 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
             speedBase = START_SPEED;
             pizzasCompleted = 0;
             levelUpTimer = 0;
+            fasterTimer = 0;
             shakeTimer = 0;
             pickNewTargetTopping();
             currentPizzaLayers = { hasDough: false, hasSauce: false, hasCheese: false, activeTopping: null };
@@ -651,8 +655,9 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
             let selectedType;
 
             // arcaide: more flies as the run goes on, and hearts get scarce fast
-            const badChance = Math.min(0.24, 0.12 + pizzasCompleted * 0.006);
-            const heartChance = Math.max(0.012, 0.05 - pizzasCompleted * 0.004);
+            // arcaide: a fly ends the round on the spot, so it has to be rare
+            const badChance = Math.min(0.09, 0.045 + pizzasCompleted * 0.0015);
+            const heartChance = Math.max(0.022, 0.05 - pizzasCompleted * 0.003);
             if (rand < badChance && pizzasCompleted > 0) {
                 selectedType = itemTypes.find(i => i.isBad);
             } else if (rand < badChance + heartChance) {
@@ -699,6 +704,7 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
 
         function update() {
             if (levelUpTimer > 0) levelUpTimer--;
+            if (fasterTimer > 0) fasterTimer--;
             if (shakeTimer > 0) shakeTimer--;
 
             if (gameState !== 'playing') return;
@@ -762,13 +768,12 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
         }
 
         function handleCatch(itemData, x, y) {
-            if (itemData.isBad) {
+            if (itemData.isBad) {          // arcaide: the fly is instant death
                 playSound('error');
-                lives--;
                 combo = 0;
-                triggerShake(6, 15);
-                addFloatingText("-1 חיים", x, y, false);
-                if (lives <= 0) triggerGameOver();
+                triggerShake(9, 22);
+                addFloatingText("זבוב! סוף משחק 🪰", x, y, false);
+                triggerGameOver();
                 return;
             }
 
@@ -807,18 +812,20 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
 
                         pizzasCompleted++;
                         const difficultyStep = Math.min(pizzasCompleted, SPEED_CAP_FROM);
-                        const extra = Math.max(0, pizzasCompleted - SPEED_CAP_FROM);
+                        const lateSteps = Math.floor(Math.max(0, pizzasCompleted - SPEED_CAP_FROM) / LATE_EVERY);
+                        const prevSpeed = speedBase;
                         spawnInterval = Math.max(HARD_MIN_SPAWN,
-                            Math.max(MIN_SPAWN_INTERVAL, START_SPAWN_INTERVAL - difficultyStep * SPAWN_STEP_PER_PIZZA) - extra * LATE_SPAWN_STEP);
+                            Math.max(MIN_SPAWN_INTERVAL, START_SPAWN_INTERVAL - difficultyStep * SPAWN_STEP_PER_PIZZA) - lateSteps * LATE_SPAWN_STEP);
                         speedBase = Math.min(HARD_MAX_SPEED,
-                            Math.min(MAX_SPEED, START_SPEED + difficultyStep * SPEED_STEP_PER_PIZZA) + extra * LATE_SPEED_STEP);
+                            Math.min(MAX_SPEED, START_SPEED + difficultyStep * SPEED_STEP_PER_PIZZA) + lateSteps * LATE_SPEED_STEP);
                         levelUpTimer = 70;
+                        if (speedBase > prevSpeed + 0.001) fasterTimer = 80;   // tell the player it just got quicker
                         playSound('levelup');
                         updateMusicPitch();
                     } else {
                         playSound('error');
                         combo = 0;
-                        addFloatingText("לא התוספת המבוקשת", x, y, false);
+                        loseLife("לא התוספת המבוקשת", x, y);
                     }
                 } else {
                     playSound('success');
@@ -833,9 +840,16 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
             } else {
                 playSound('error');
                 combo = 0;
-                addFloatingText("לא לפי הסדר", x, y, false);
+                loseLife("לא לפי הסדר", x, y);
                 triggerShake(3, 8);
             }
+        }
+
+        // every mistake costs a life; at zero the round is over
+        function loseLife(reason, x, y) {
+            lives--;
+            addFloatingText(reason + " · -1 ❤️", x, y, false);
+            if (lives <= 0) triggerGameOver();
         }
 
         function triggerGameOver() {
@@ -1031,26 +1045,78 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
             ctx.fillStyle = "#fff";
             ctx.font = "bold 15px 'Segoe UI'";
             ctx.textAlign = "right";
-            ctx.fillText(`🍕 מגשים: ${pizzasCompleted}`, canvas.width - 15, 25);
-            ctx.fillText(`❤️ חיים: ${'❤️'.repeat(Math.min(lives, 5))}`, canvas.width - 15, 50);
+            const shownLives = Math.max(0, Math.min(lives, 3));
+            ctx.fillText('❤️'.repeat(shownLives) + '🤍'.repeat(3 - shownLives), canvas.width - 15, 28);
 
             ctx.textAlign = "left";
-            ctx.fillText(`🍕 מגשים: ${pizzasCompleted}`, 15, 25);
+            ctx.fillText(`🍕 ${pizzasCompleted}`, 15, 28);
             if (combo > 1) {
                 ctx.fillStyle = "#ffcc00";
-                ctx.fillText(`🔥 קומבו: ${combo}`, 15, 50);
+                ctx.fillText(`🔥 קומבו: ${combo}`, 15, 52);
             } else if (isSlowMotion) {
                 ctx.fillStyle = "#00b4d8";
-                ctx.fillText(`⏱️ האטה פעילה!`, 15, 50);
+                ctx.fillText(`⏱️ האטה!`, 15, 52);
             }
 
-            ctx.textAlign = "center";
-            ctx.font = "bold 17px 'Segoe UI'";
-            ctx.fillStyle = "#ffcc00";
-            let reqText = stepsOrder[currentStep] === 'topping'
-                ? `תוספת נדרשת: 🟢 ${targetTopping}`
-                : `מצרך נדרש: ${stepsOrder[currentStep] === 'dough' ? 'בצק 🫓' : stepsOrder[currentStep] === 'sauce' ? 'רוטב 🥫' : 'גבינה 🧀'}`;
-            ctx.fillText(reqText, canvas.width / 2, 30);
+            drawNextIngredient();
+        }
+
+        // the next ingredient is the one thing the player must never miss — give it a real badge
+        let reqPulse = 0;
+        let lastShownStep = null;
+        function drawNextIngredient() {
+            const step = stepsOrder[currentStep];
+            const key = step + (step === 'topping' ? targetTopping : '');
+            if (key !== lastShownStep) { lastShownStep = key; reqPulse = 26; }
+            if (reqPulse > 0) reqPulse--;
+
+            const info = {
+                dough:   { emoji: '🫓', label: 'בצק' },
+                sauce:   { emoji: '🥫', label: 'רוטב' },
+                cheese:  { emoji: '🧀', label: 'גבינה' },
+                topping: { emoji: targetTopping, label: 'תוספת' }
+            }[step];
+
+            const w = Math.min(230, canvas.width - 120), h = 62;
+            const x = canvas.width / 2 - w / 2, y = 10;
+            const grow = 1 + 0.06 * Math.sin((26 - reqPulse) / 26 * Math.PI) * (reqPulse > 0 ? 1 : 0);
+
+            ctx.save();
+            ctx.translate(canvas.width / 2, y + h / 2);
+            ctx.scale(grow, grow);
+            ctx.translate(-canvas.width / 2, -(y + h / 2));
+
+            ctx.beginPath();
+            const r = 16;
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y, x + w, y + h, r);
+            ctx.arcTo(x + w, y + h, x, y + h, r);
+            ctx.arcTo(x, y + h, x, y, r);
+            ctx.arcTo(x, y, x + w, y, r);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(10,10,16,0.72)';
+            ctx.fill();
+            ctx.lineWidth = reqPulse > 0 ? 3 : 2;
+            ctx.strokeStyle = '#ffcc00';
+            ctx.shadowColor = 'rgba(255,204,0,0.55)';
+            ctx.shadowBlur = reqPulse > 0 ? 18 : 8;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = "600 13px 'Segoe UI'";
+            ctx.fillStyle = '#ffe9a3';
+            ctx.fillText('המצרך הבא', canvas.width / 2, y + 15);
+
+            ctx.font = "34px Arial";
+            ctx.fillText(info.emoji, canvas.width / 2 - 42, y + 40);
+
+            ctx.font = "bold 22px 'Segoe UI'";
+            ctx.fillStyle = '#ffcc00';
+            ctx.fillText(info.label, canvas.width / 2 + 26, y + 41);
+            ctx.restore();
+            ctx.textBaseline = 'alphabetic';
         }
 
         function drawBottomHud() {
@@ -1071,11 +1137,11 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
                 ctx.fillStyle = i < currentStep ? '#52b788' : (i === currentStep ? '#ffcc00' : '#444');
                 ctx.fillRect(barX + i * stepWidth + 2, barY, stepWidth - 4, 10);
 
-                ctx.font = "14px Arial";
+                ctx.font = (i === currentStep ? "bold 19px" : "14px") + " Arial";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
-                ctx.fillStyle = "#fff";
-                ctx.fillText(stepIcons[stepsOrder[i]], barX + i * stepWidth + stepWidth / 2, barY + 24);
+                ctx.fillStyle = i === currentStep ? "#ffcc00" : "#fff";
+                ctx.fillText(stepIcons[stepsOrder[i]], barX + i * stepWidth + stepWidth / 2, barY + 25);
             }
 
             // מונה מגשים ויזואלי - שורת פיצות שגדלה עם כל מגש שהושלם
@@ -1098,6 +1164,12 @@ html[data-arcade-theme="light"] .high-score-item{color:#2b3550}
             ctx.shadowColor = "#ff4500";
             ctx.shadowBlur = 15;
             ctx.fillText(`🍕 מגש מס' ${pizzasCompleted} הושלם! 🍕`, canvas.width / 2, canvas.height / 2 - 100);
+            if (fasterTimer > 0) {
+                ctx.globalAlpha = Math.min(1, fasterTimer / 20);
+                ctx.fillStyle = "#ff6b3d";
+                ctx.font = "bold 22px 'Segoe UI'";
+                ctx.fillText('⚡ מהירות עולה!', canvas.width / 2, canvas.height / 2 - 66);
+            }
             ctx.restore();
         }
 
